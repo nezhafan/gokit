@@ -9,31 +9,14 @@ import (
 	"math"
 	"runtime"
 	"strings"
-	"unicode"
 )
 
-// 打印JSON
 func JSON(v any) string {
 	bs, err := json.Marshal(v)
 	if err != nil {
 		return ""
 	}
 	return string(bs)
-}
-
-// 是否为ASCII
-func IsASCII(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] > unicode.MaxASCII {
-			return false
-		}
-	}
-	return true
-}
-
-// 是否有效数字（float64存在NaN和Inf的可能）
-func IsNumber(f float64) bool {
-	return !math.IsNaN(f) && !math.IsInf(f, 0)
 }
 
 // 除法，截断保留x位小数 (非四舍五入)
@@ -92,4 +75,10 @@ func Callers() []string {
 	}
 
 	return callers
+}
+
+// 返回指针类型
+// 例如 Of(float32(0.7)) 返回 *float32, 1.26可以直接 `new(float32(0.3))`
+func Of[T any](v T) *T {
+	return &v
 }

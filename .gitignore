@@ -1,7 +1,2 @@
 tmp
-database
-frame
-dbx
-main_test.go
-main.go
-.vscode
+x_test.go

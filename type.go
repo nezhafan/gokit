@@ -20,7 +20,6 @@ type Number interface {
 	Integer | Float
 }
 
-// 等同 cmp.Ordered“
 type Ordered interface {
 	Integer | Float | ~string
 }

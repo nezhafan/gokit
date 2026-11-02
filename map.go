@@ -2,7 +2,7 @@ package toolkit
 
 import "sync"
 
-// 安全map再封装
+/**** sync.Map 泛型封装 ****/
 
 type Map[K comparable, V any] struct {
 	data sync.Map
