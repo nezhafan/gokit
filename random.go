@@ -6,11 +6,7 @@ import (
 	"math/big"
 )
 
-var (
-	defaultCharset = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-)
-
-// 随机数，适用于高安全性的场景。
+// 随机数 [0, max) ，适用于高安全性的场景。
 // 对于大量且非安全性高的使用 math/rand/v2 的 rand.IntN() 即可，速度相差几十倍
 func RandomIntN(max int) int {
 	m := big.NewInt(int64(max))
@@ -22,15 +18,19 @@ func RandomIntN(max int) int {
 	return int(n.Int64())
 }
 
+var (
+	defaultCharset = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+)
+
 // 随机字符串
-// 使用本包的 RandIntN 或 math/rand/v2 的 rand.IntN
-func RandomString(intN func(max int) int, size int, charset []byte) (string, error) {
+// 随机数方法使用本包的 RandomIntN 或 math/rand/v2 的 rand.IntN
+func RandomString(intN func(int) int, size int, charset []byte) (string, error) {
 	if intN == nil {
-		return "", errors.New("StringN generate random number function is nil")
+		return "", errors.New("intN can not be nil")
 	}
 
 	if size <= 0 {
-		return "", errors.New("StringN size must be greater than 0")
+		return "", errors.New("size must be greater than 0")
 	}
 
 	if len(charset) == 0 {

@@ -9,14 +9,23 @@ import (
 	"math"
 	"runtime"
 	"strings"
+	"time"
 )
 
-func JSON(v any) string {
+// 毫秒时间
+const DatetimeMilli = time.DateTime + ".000"
+
+func MustJSON(v any) string {
+	raw := MustRaw(v)
+	return string(raw)
+}
+
+func MustRaw(v any) json.RawMessage {
 	bs, err := json.Marshal(v)
 	if err != nil {
-		return ""
+		return nil
 	}
-	return string(bs)
+	return bs
 }
 
 // 除法，截断保留x位小数 (非四舍五入)
@@ -30,7 +39,8 @@ func DivTrunc[E Number](a, b E, precision uint8) float64 {
 // 截断保留x位小数 (非四舍五入)
 func Trunc(n float64, precision uint8) float64 {
 	pow := math.Pow(10, float64(precision))
-	if n = math.Trunc(n * pow); !IsNumber(n) {
+	n = math.Trunc(n * pow)
+	if !IsNumber(n) {
 		return 0
 	}
 	return n / pow
@@ -51,9 +61,9 @@ func HmacSha256(s string, key []byte) string {
 }
 
 // 追踪调用位置
-func Callers() []string {
+func GetStack() []string {
 	pc := make([]uintptr, 8)
-	n := runtime.Callers(3, pc)
+	n := runtime.Callers(2, pc)
 	if n == 0 {
 		return nil
 	}
@@ -77,8 +87,8 @@ func Callers() []string {
 	return callers
 }
 
-// 返回指针类型
+// 返回指针类型 （有些结构体字段为 *string 或 *int，减少一行代码）
 // 例如 Of(float32(0.7)) 返回 *float32, 1.26可以直接 `new(float32(0.3))`
-func Of[T any](v T) *T {
+func Of[T Ordered](v T) *T {
 	return &v
 }

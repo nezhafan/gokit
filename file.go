@@ -2,6 +2,8 @@ package toolkit
 
 import (
 	"bufio"
+	"encoding/csv"
+	"io"
 	"os"
 )
 
@@ -36,4 +38,30 @@ func ReadFileByLine(path string, fn func(string) error) error {
 	}
 
 	return scanner.Err()
+}
+
+// 读取CSV （fn内的[]string为复用结构，禁止直接保存或传递）
+func ReadCSV(path string, fn func([]string) error) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	reader.ReuseRecord = true // 复用同一底层数组，减少分配
+
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break // 读取完毕
+		}
+		if err != nil {
+			return err
+		}
+		if err = fn(record); err != nil {
+			return err
+		}
+	}
+	return nil
 }

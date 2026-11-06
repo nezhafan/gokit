@@ -2,23 +2,15 @@ package toolkit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+	"net/url"
 	"strconv"
 	"time"
-
-	"github.com/valyala/bytebufferpool"
-)
-
-var (
-	// 默认client，10秒超时
-	defaultHttpClient = &http.Client{Timeout: time.Second * 10}
-	// 日志输出
-	httpLogger io.Writer = os.Stdout
 )
 
 const (
@@ -26,78 +18,63 @@ const (
 	postFormContentType = "application/x-www-form-urlencoded"
 )
 
-// 日志输出。 传入nil则关闭
-func HttpSetLogger(l io.Writer) {
-	httpLogger = l
-}
-
 // 结构体支持
 type Request struct {
-	url     string
-	method  string
-	body    []byte
-	header  map[string]string
-	timeout time.Duration
+	url    string
+	method string
+	body   []byte
+	header map[string]string
 }
 
-func HttpGet(url string, params map[string]string) *Request {
-	r := &Request{
-		url:    url,
-		method: http.MethodGet,
+func HttpGet(api string, params map[string]string) *Request {
+	if len(params) > 0 {
+		values := url.Values{}
+		for k, v := range params {
+			values.Add(k, v)
+		}
+		api += "?" + values.Encode()
 	}
 
-	if len(params) > 0 {
-		buf := bytebufferpool.Get()
-		defer bytebufferpool.Put(buf)
-
-		buf.WriteString(r.url + "?")
-		for k, v := range params {
-			buf.WriteString(k + "=" + v + "&")
-		}
-
-		r.url = buf.String()[:buf.Len()-1]
+	r := &Request{
+		url:    api,
+		method: http.MethodGet,
 	}
 
 	return r
 }
 
-func HttpPostJson(url string, data any) *Request {
+func HttpPostJson(api string, data any) *Request {
 	r := &Request{
-		url:    url,
+		url:    api,
 		method: http.MethodPost,
 		header: map[string]string{"Content-Type": postJsonContentType},
 	}
 
 	if data != nil {
-		bs, _ := json.Marshal(data)
-		r.body = bs
+		if bs, err := json.Marshal(data); err == nil {
+			r.body = bs
+		}
 	}
 
 	return r
 }
 
-func HttpPostForm(url string, data map[string]any) *Request {
+func HttpPostForm(api string, data map[string]any) *Request {
 	r := &Request{
-		url:    url,
+		url:    api,
 		method: http.MethodPost,
 		header: map[string]string{"Content-Type": postFormContentType},
 	}
 
-	r.body = buildForm(data)
+	if len(data) > 0 {
+		values := url.Values{}
+		for k, v := range data {
+			values.Add(k, fmt.Sprintf("%v", v))
+		}
+		r.body = []byte(values.Encode())
+	}
 
 	return r
-}
-
-func buildForm(data map[string]any) []byte {
-	if len(data) == 0 {
-		return nil
-	}
-	buf := bytebufferpool.Get()
-	defer bytebufferpool.Put(buf)
-	for k, v := range data {
-		buf.WriteString(k + "=" + fmt.Sprintf("%v", v) + "&")
-	}
-	return buf.Bytes()[:buf.Len()-1]
 }
 
 func (r *Request) SetHeader(key, value string) *Request {
@@ -108,17 +85,14 @@ func (r *Request) SetHeader(key, value string) *Request {
 	return r
 }
 
-func (r *Request) SetTimeout(t time.Duration) *Request {
-	r.timeout = t
-	return r
-}
-
-func (r *Request) Do(data any) (err error) {
+func (r *Request) Do(ctx context.Context, data any) (err error) {
 	start := time.Now()
+	var b []byte
+	defer r.log(start, &b, &err)
 
-	req, err := http.NewRequest(r.method, r.url, bytes.NewReader(r.body))
+	var req *http.Request
+	req, err = http.NewRequestWithContext(ctx, r.method, r.url, bytes.NewReader(r.body))
 	if err != nil {
-		r.log(start, nil, err)
 		return
 	}
 
@@ -126,77 +100,77 @@ func (r *Request) Do(data any) (err error) {
 		req.Header.Set(k, v)
 	}
 
-	client := defaultHttpClient
-	if r.timeout > 0 && client.Timeout != r.timeout {
-		client = &http.Client{Timeout: r.timeout}
-	}
-
-	resp, err := client.Do(req)
+	var res *http.Response
+	res, err = http.DefaultClient.Do(req)
 	if err != nil {
-		r.log(start, nil, err)
 		return
 	}
-	defer resp.Body.Close()
-
-	// 判断状态码
-	if resp.StatusCode >= http.StatusMultipleChoices {
-		err = errors.New("HTTP返回状态码异常: " + resp.Status)
-		return
-	}
+	defer res.Body.Close()
 
 	// 解析body
-	b, err := io.ReadAll(resp.Body)
+	b, err = io.ReadAll(res.Body)
 	if err != nil {
-		r.log(start, nil, err)
 		return
 	}
-	err = json.Unmarshal(b, data)
-	r.log(start, b, err)
+
+	// 判断状态码，放在读取 body 之后，避免被 ReadAll/json.Unmarshal 覆盖
+	if res.StatusCode >= http.StatusMultipleChoices {
+		err = errors.New("HTTP状态码异常: " + res.Status)
+		return
+	}
+
+	if data != nil && len(b) > 0 {
+		err = json.Unmarshal(b, data)
+	}
+
 	return
 }
 
 type requestLog struct {
-	Level    string          `json:"level"`
-	Time     string          `json:"time"`
-	Api      string          `json:"api"`
-	Method   string          `json:"method"`
-	Cost     string          `json:"cost"`
-	Err      string          `json:"error,omitempty"`
-	Body     any             `json:"body,omitempty"`
-	Response json.RawMessage `json:"response,omitempty"`
+	Time     string `json:"time"`
+	Url      string `json:"url"`
+	Method   string `json:"method"`
+	Cost     string `json:"cost"`
+	Err      string `json:"error,omitempty"`
+	Body     any    `json:"body,omitempty"`
+	Response any    `json:"response,omitempty"`
 }
 
-const datetime = "2006-01-02 15:04:05"
-
-func (r *Request) log(start time.Time, resp []byte, err error) {
-	if httpLogger == nil {
-		return
-	}
-
+func (r *Request) log(start time.Time, res *[]byte, err *error) {
+	cost := int(time.Since(start).Milliseconds())
 	data := requestLog{
-		Time:     start.Format(datetime),
-		Api:      r.url,
-		Method:   r.method,
-		Cost:     strconv.Itoa(int(time.Since(start).Milliseconds())) + "ms",
-		Response: resp,
+		Time:   start.Format(time.DateTime),
+		Url:    r.url,
+		Method: r.method,
+		Cost:   strconv.Itoa(cost) + "ms",
 	}
 	if len(r.body) > 0 {
 		if r.header["Content-Type"] == postJsonContentType {
-			data.Body = r.body
+			data.Body = json.RawMessage(r.body)
 		} else {
 			data.Body = string(r.body)
 		}
 	}
-	if err != nil {
-		data.Err = err.Error()
+
+	if res != nil {
+		b := *res
+		// 防止超大日志
+		if len(b) >= 4096 {
+			b = b[:4096]
+		}
+		// 如果返回的是json格式则防止二次编码
+		if json.Valid(b) {
+			data.Response = json.RawMessage(b)
+		} else {
+			data.Response = string(b)
+		}
 	}
-
-	buf := bytebufferpool.Get()
-	defer bytebufferpool.Put(buf)
-	enc := json.NewEncoder(buf)
-	enc.SetEscapeHTML(false)
-	enc.Encode(data)
-	buf.WriteByte('\n')
-
-	httpLogger.Write(buf.Bytes())
+	if err != nil && *err != nil {
+		data.Err = (*err).Error()
+		LogError("HTTP请求", "data", data)
+	} else if cost >= 1000 {
+		LogWarn("HTTP请求", "data", data)
+	} else {
+		LogInfo("HTTP请求", "data", data)
+	}
 }
