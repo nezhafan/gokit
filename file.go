@@ -1,4 +1,4 @@
-package toolkit
+package gokit
 
 import (
 	"bufio"

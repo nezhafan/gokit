@@ -1,6 +1,6 @@
 //go:build debug
 
-package toolkit
+package gokit
 
 const IsDebug = true
 

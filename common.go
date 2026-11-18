@@ -1,4 +1,4 @@
-package toolkit
+package gokit
 
 import (
 	"crypto/hmac"
@@ -9,11 +9,7 @@ import (
 	"math"
 	"runtime"
 	"strings"
-	"time"
 )
-
-// 毫秒时间
-const DatetimeMilli = time.DateTime + ".000"
 
 func MustJSON(v any) string {
 	raw := MustRaw(v)
@@ -60,35 +56,26 @@ func HmacSha256(s string, key []byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// 追踪调用位置
-func GetStack() []string {
-	pc := make([]uintptr, 8)
-	n := runtime.Callers(2, pc)
-	if n == 0 {
-		return nil
+func GetCaller(skip int) string {
+	pc, file, line, ok := runtime.Caller(skip + 2)
+	if !ok {
+		return ""
 	}
 
-	callers := make([]string, 0, n)
-
-	pc = pc[:n]
-	for _, p := range pc {
-		fn := runtime.FuncForPC(p)
-		if fn == nil {
-			continue
+	if idx := strings.LastIndex(file, "/"); idx != -1 {
+		if prev := strings.LastIndex(file[:idx], "/"); prev != -1 {
+			file = file[prev+1:]
 		}
-		file, line := fn.FileLine(p)
-		arr := strings.Split(file, "/")
-		if len(arr) > 3 {
-			file = strings.Join(arr[len(arr)-3:], "/")
-		}
-		callers = append(callers, fmt.Sprintf("%s:%d", file, line))
 	}
 
-	return callers
-}
+	fn := runtime.FuncForPC(pc)
+	funcName := ""
+	if fn != nil {
+		funcName = fn.Name()
+		if idx := strings.LastIndex(funcName, "/"); idx != -1 {
+			funcName = funcName[idx+1:]
+		}
+	}
 
-// 返回指针类型 （有些结构体字段为 *string 或 *int，减少一行代码）
-// 例如 Of(float32(0.7)) 返回 *float32, 1.26可以直接 `new(float32(0.3))`
-func Of[T Ordered](v T) *T {
-	return &v
+	return fmt.Sprintf("%s:%d (%s)", file, line, funcName)
 }

@@ -1,4 +1,4 @@
-package toolkit
+package gokit
 
 import (
 	"math"
@@ -8,6 +8,7 @@ import (
 
 // 是否为ASCII
 func IsASCII(s string) bool {
+
 	for i := 0; i < len(s); i++ {
 		if s[i] > unicode.MaxASCII {
 			return false

@@ -1,28 +1,26 @@
-package toolkit
+package gokit
 
 import (
 	"io"
 	"log/slog"
-	"os"
+	"time"
 )
 
-func init() {
-	SetDefaultLog(os.Stdout, slog.LevelDebug)
-}
+const datetimeMilli = time.DateTime + ".000"
 
-func SetDefaultLog(w io.Writer, level slog.Level) {
+func NewLogger(w io.Writer, level slog.Level) *slog.Logger {
 	jsonHandler := slog.NewJSONHandler(w, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if a.Key == slog.TimeKey && len(groups) == 0 {
 				t := a.Value.Time()
-				return slog.String(slog.TimeKey, t.Format(DatetimeMilli))
+				return slog.String(slog.TimeKey, t.Format(datetimeMilli))
 			}
 			return a
 		},
 	})
 
-	slog.SetDefault(slog.New(jsonHandler))
+	return slog.New(jsonHandler)
 }
 
 func LogDebug(msg string, args ...any) {
@@ -38,7 +36,5 @@ func LogWarn(msg string, args ...any) {
 }
 
 func LogError(msg string, args ...any) {
-	// 捕获链路
-	stack := GetStack()
-	slog.Default().With("stack", stack).Error(msg, args...)
+	slog.Default().With("caller", GetCaller(0)).Error(msg, args...)
 }

@@ -1,4 +1,4 @@
-package toolkit
+package gokit
 
 import (
 	"bytes"
@@ -127,7 +127,7 @@ func (r *Request) Do(ctx context.Context, data any) (err error) {
 }
 
 type requestLog struct {
-	Time     string `json:"time"`
+	Start    string `json:"start"`
 	Url      string `json:"url"`
 	Method   string `json:"method"`
 	Cost     string `json:"cost"`
@@ -139,7 +139,7 @@ type requestLog struct {
 func (r *Request) log(start time.Time, res *[]byte, err *error) {
 	cost := int(time.Since(start).Milliseconds())
 	data := requestLog{
-		Time:   start.Format(time.DateTime),
+		Start:  start.Format(time.DateTime),
 		Url:    r.url,
 		Method: r.method,
 		Cost:   strconv.Itoa(cost) + "ms",
