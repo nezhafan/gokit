@@ -8,7 +8,7 @@ import (
 
 const datetimeMilli = time.DateTime + ".000"
 
-func NewLogger(w io.Writer, level slog.Level) *slog.Logger {
+func NewLogger(w io.Writer, level Level) *slog.Logger {
 	jsonHandler := slog.NewJSONHandler(w, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -21,6 +21,20 @@ func NewLogger(w io.Writer, level slog.Level) *slog.Logger {
 	})
 
 	return slog.New(jsonHandler)
+}
+
+type Level = slog.Level
+
+const (
+	LevelDebug = slog.LevelDebug
+	LevelInfo  = slog.LevelInfo
+	LevelWarn  = slog.LevelWarn
+	LevelError = slog.LevelError
+)
+
+func SetLogger(w io.Writer, level Level) {
+	l := NewLogger(w, level)
+	slog.SetDefault(l)
 }
 
 func LogDebug(msg string, args ...any) {

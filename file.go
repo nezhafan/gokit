@@ -9,7 +9,7 @@ import (
 
 /**** 文件操作 ****/
 
-// 文件是否存在（不含权限）
+// 文件是否存在 (不考虑权限)
 func IsFileExist(path string) bool {
 	_, err := os.Stat(path)
 	if err == nil {

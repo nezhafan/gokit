@@ -9,6 +9,10 @@ import (
 // 随机数 [0, max) ，适用于高安全性的场景。
 // 对于大量且非安全性高的使用 math/rand/v2 的 rand.IntN() 即可，速度相差几十倍
 func RandomIntN(max int) int {
+	if max <= 0 {
+		return 0
+	}
+
 	m := big.NewInt(int64(max))
 	// 在现代 Go 版本中，使用 rand.Reader 时几乎不会出错
 	n, err := rand.Int(rand.Reader, m)

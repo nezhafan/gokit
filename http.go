@@ -18,6 +18,10 @@ const (
 	postFormContentType = "application/x-www-form-urlencoded"
 )
 
+var (
+	defaultClient = http.Client{Timeout: time.Minute}
+)
+
 // 结构体支持
 type Request struct {
 	url    string
@@ -26,6 +30,9 @@ type Request struct {
 	header map[string]string
 }
 
+// 用法：
+//
+//	err := HttpGet("http://a.com", nil).Do(ctx, &result)
 func HttpGet(api string, params map[string]string) *Request {
 	if len(params) > 0 {
 		values := url.Values{}
@@ -43,6 +50,9 @@ func HttpGet(api string, params map[string]string) *Request {
 	return r
 }
 
+// 用法：
+//
+//	err := HttpPostJson("http://a.com", data).Do(ctx, &result)
 func HttpPostJson(api string, data any) *Request {
 	r := &Request{
 		url:    api,
@@ -59,10 +69,44 @@ func HttpPostJson(api string, data any) *Request {
 	return r
 }
 
+// 用法：
+//
+//	err := HttpPostForm("http://a.com", data).Do(ctx, &result)
 func HttpPostForm(api string, data map[string]any) *Request {
 	r := &Request{
 		url:    api,
-		method: http.MethodPost,
+		method: http.MethodPut,
+		header: map[string]string{"Content-Type": postJsonContentType},
+	}
+
+	if data != nil {
+		if bs, err := json.Marshal(data); err == nil {
+			r.body = bs
+		}
+	}
+
+	return r
+}
+
+// 用法：
+//
+//	err := HttpPostForm("http://a.com", data).Do(ctx, &result)
+func HttpHead(api string) *Request {
+	r := &Request{
+		url:    api,
+		method: http.MethodHead,
+	}
+
+	return r
+}
+
+// 用法：
+//
+//	err := HttpPutJson("http://a.com", data).Do(ctx, &result)
+func HttpPutJson(api string, data map[string]any) *Request {
+	r := &Request{
+		url:    api,
+		method: http.MethodPut,
 		header: map[string]string{"Content-Type": postFormContentType},
 	}
 
@@ -101,7 +145,7 @@ func (r *Request) Do(ctx context.Context, data any) (err error) {
 	}
 
 	var res *http.Response
-	res, err = http.DefaultClient.Do(req)
+	res, err = defaultClient.Do(req)
 	if err != nil {
 		return
 	}
